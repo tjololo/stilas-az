@@ -1,0 +1,36 @@
+name: Bazel build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: bazel-contrib/setup-bazel@0.9.0
+        with:
+          bazelisk-cache: true
+          # Store build cache per workflow.
+          disk-cache: ${{ github.workflow }}-${{ matrix.os }}
+          # Share repository cache between workflows.
+          repository-cache: true
+      - uses: actions/checkout@v4
+      - name: Check formatting
+        run: |
+          bazel run //:buildifier.check
+      - name: Test
+        if: false
+        run: |
+          bazel test //...
+      - name: Build
+        run: |
+          bazel build //...
