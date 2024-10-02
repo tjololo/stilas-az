@@ -1,11 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "rebaseWhen": "conflict",
+  "rebaseWhen": "conflicted",
   "extends": [
     "config:recommended"
   ],
   "packageRules": [
-        {
+    {
       "matchManagers": [
         "bazel-module",
         "gomod"
