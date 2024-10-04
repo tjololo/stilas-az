@@ -8,6 +8,7 @@ rules:
   - apim.azure.stilas.418.cloud
   resources:
   - productapis
+  - productapiversions
   verbs:
   - create
   - delete
@@ -20,12 +21,14 @@ rules:
   - apim.azure.stilas.418.cloud
   resources:
   - productapis/finalizers
+  - productapiversions/finalizers
   verbs:
   - update
 - apiGroups:
   - apim.azure.stilas.418.cloud
   resources:
   - productapis/status
+  - productapiversions/status
   verbs:
   - get
   - patch

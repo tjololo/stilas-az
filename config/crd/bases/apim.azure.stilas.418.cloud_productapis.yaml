@@ -51,6 +51,16 @@ spec:
                 description: Protocols - Describes protocols used by the API. Default
                   value is [https].
                 type: string
+              apiVersionScheme:
+                default: Segment
+                description: ApiVersionShceme - Indicates the versioning scheme used
+                  for the API. Possible values include, but are not limited to, "Segment",
+                  "Query", "Header". Default value is "Segment".
+                enum:
+                - Header
+                - Query
+                - Segment
+                type: string
               contact:
                 description: Contact - Contact details of the API owner.
                 properties:

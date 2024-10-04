@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	apim "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/apimanagement/armapimanagement/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,14 +29,32 @@ type ProductApiVersionSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of ProductApiVersion. Edit productapiversion_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	//VName - Version identifier for the API Version.
+	//+kubebuilder:validation:Required
+	Name string `json:"foo,omitempty"`
+	//VersionDescription - Description of the API Version.
+	//+kubebuilder:validation:Optional
+	Description *string `json:"versionDescription,omitempty"`
+	//VersioningScheme - An value that determines where the API Version identifer will be located in a HTTP request.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:="Segment"
+	//+kubebuilder:validation:Enum:=Header;Query;Segment
+	VersioningScheme APIVersionScheme `json:"versioningScheme,omitempty"`
 }
 
 // ProductApiVersionStatus defines the observed state of ProductApiVersion
 type ProductApiVersionStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	//+kubebuilder:validation:Optional
+	ApiVersionSetID string `json:"apiVersionSetID,omitempty"`
+	//+kubebuilder:validation:Optional
+	//ProvisioningState - The provisioning state of the API. Possible values are: Creating, Succeeded, Failed, Updating, Deleting, and Deleted.
+	//+kubebuilder:validation:Optional
+	ProvisioningState string `json:"provisioningState,omitempty"`
+	//ResumeToken - The token used to track long-running operations.
+	//+kubebuilder:validation:Optional
+	ResumeToken string `json:"pollerToken,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -61,4 +80,31 @@ type ProductApiVersionList struct {
 
 func init() {
 	SchemeBuilder.Register(&ProductApiVersion{}, &ProductApiVersionList{})
+}
+
+type APIVersionScheme string
+
+const (
+	// APIVersionSetContractDetailsVersioningSchemeHeader - The API Version is passed in a HTTP header.
+	APIVersionSetContractDetailsVersioningSchemeHeader APIVersionScheme = "Header"
+	// APIVersionSetContractDetailsVersioningSchemeQuery - The API Version is passed in a query parameter.
+	APIVersionSetContractDetailsVersioningSchemeQuery APIVersionScheme = "Query"
+	// APIVersionSetContractDetailsVersioningSchemeSegment - The API Version is passed in a path segment.
+	APIVersionSetContractDetailsVersioningSchemeSegment APIVersionScheme = "Segment"
+)
+
+func (a *APIVersionScheme) AzureAPIVersionScheme() *apim.VersioningScheme {
+	if a == nil {
+		return nil
+	}
+	apiVersionScheme := apim.VersioningScheme(*a)
+	return &apiVersionScheme
+}
+
+func (a *APIVersionScheme) AzureAPIVersionSetContractDetailsVersioningScheme() *apim.APIVersionSetContractDetailsVersioningScheme {
+	if a == nil {
+		return nil
+	}
+	apiVersionScheme := apim.APIVersionSetContractDetailsVersioningScheme(*a)
+	return &apiVersionScheme
 }

@@ -18,6 +18,9 @@ package controller
 
 import (
 	"context"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	apim "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/apimanagement/armapimanagement/v2"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -47,9 +50,64 @@ type ProductApiVersionReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *ProductApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
+	var productApiVersion apimv1alpha1.ProductApiVersion
+	if err := r.Get(ctx, req.NamespacedName, &productApiVersion); err != nil {
+		logger.Error(err, "unable to fetch CronJob")
+		// we'll ignore not-found errors, since they can't be fixed by an immediate
+		// requeue (we'll need to wait for a new notification), and we can get them
+		// on deleted requests.
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	if productApiVersion.Status.ProvisioningState == "Succeeded" {
+		logger.Info("Resource already provisioned successfully")
+		return ctrl.Result{}, nil
+	}
+	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		logger.Error(err, "Failed to get Azure credentials")
+		return ctrl.Result{RequeueAfter: 5 * time.Minute}, err
+	}
+	subscriptionID, resourcesGroup, apimName, err := getConfigFromEnv()
+	if err != nil {
+		logger.Error(err, "Failed to get configuration. No reason to requeue")
+		return ctrl.Result{}, nil
+	}
+	apimanagementClientFactory, err := apim.NewClientFactory(subscriptionID, cred, nil)
+	if err != nil {
+		logger.Error(err, "Failed to create apimanagement client factory")
+		return ctrl.Result{RequeueAfter: 5 * time.Minute}, err
+	}
+	apiVersionClient := apimanagementClientFactory.NewAPIVersionSetClient()
 
-	// TODO(user): your logic here
+	result, err := apiVersionClient.CreateOrUpdate(
+		ctx,
+		resourcesGroup,
+		apimName,
+		productApiVersion.Spec.Name,
+		apim.APIVersionSetContract{
+			Properties: &apim.APIVersionSetContractProperties{
+				DisplayName:      &productApiVersion.Spec.Name,
+				VersioningScheme: productApiVersion.Spec.VersioningScheme.AzureAPIVersionScheme(),
+				Description:      productApiVersion.Spec.Description,
+			},
+			Name: &productApiVersion.Name,
+		},
+		nil)
+
+	if err != nil {
+		logger.Error(err, "Failed to create or update API version")
+		return ctrl.Result{RequeueAfter: 5 * time.Minute}, err
+	}
+	if result.ID == nil {
+		logger.Info("No result returned")
+		return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	}
+
+	productApiVersion.Status.ProvisioningState = "Succeeded"
+	productApiVersion.Status.ApiVersionSetID = *result.ID
+
+	err = r.Status().Update(ctx, &productApiVersion)
 
 	return ctrl.Result{}, nil
 }

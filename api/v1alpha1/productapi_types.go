@@ -46,6 +46,11 @@ type ProductApiSpec struct {
 	//Protocols - Describes protocols used by the API. Default value is [https].
 	//+kubebuilder:validation:Optional
 	ApiVersion string `json:"apiVersion,omitempty"`
+	//ApiVersionShceme - Indicates the versioning scheme used for the API. Possible values include, but are not limited to, "Segment", "Query", "Header". Default value is "Segment".
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:="Segment"
+	//+kubebuilder:validation:Enum:=Header;Query;Segment
+	ApiVersionScheme *APIVersionScheme `json:"apiVersionScheme,omitempty"`
 	//ApiType - Type of API.
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:="http"
