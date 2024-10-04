@@ -48,3 +48,4 @@ go.work
 /.sass-cache
 
 .env
+*.ignore.*
