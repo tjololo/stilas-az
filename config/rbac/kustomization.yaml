@@ -22,6 +22,8 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- productapiversion_editor_role.yaml
+- productapiversion_viewer_role.yaml
 - productapi_editor_role.yaml
 - productapi_viewer_role.yaml
 
