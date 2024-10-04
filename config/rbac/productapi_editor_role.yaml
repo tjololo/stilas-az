@@ -1,8 +1,11 @@
----
+# permissions for end users to edit productapis.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: stilas-az
+    app.kubernetes.io/managed-by: kustomize
+  name: productapi-editor-role
 rules:
 - apiGroups:
   - apim.azure.stilas.418.cloud
@@ -19,14 +22,6 @@ rules:
 - apiGroups:
   - apim.azure.stilas.418.cloud
   resources:
-  - productapis/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apim.azure.stilas.418.cloud
-  resources:
   - productapis/status
   verbs:
   - get
-  - patch
-  - update

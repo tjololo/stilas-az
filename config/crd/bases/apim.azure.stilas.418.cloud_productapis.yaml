@@ -1,0 +1,133 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.1
+  name: productapis.apim.azure.stilas.418.cloud
+spec:
+  group: apim.azure.stilas.418.cloud
+  names:
+    kind: ProductApi
+    listKind: ProductApiList
+    plural: productapis
+    singular: productapi
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ProductApi is the Schema for the productapis API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ProductApiSpec defines the desired state of ProductApi
+            properties:
+              apiType:
+                default: http
+                description: ApiType - Type of API.
+                enum:
+                - graphql
+                - http
+                - websocket
+                type: string
+              apiVersion:
+                description: Protocols - Describes protocols used by the API. Default
+                  value is [https].
+                type: string
+              contact:
+                description: Contact - Contact details of the API owner.
+                properties:
+                  email:
+                    description: The email address of the contact person/organization.
+                      MUST be in the format of an email address
+                    type: string
+                  name:
+                    description: The identifying name of the contact person/organization
+                    type: string
+                  url:
+                    description: The URL pointing to the contact information. MUST
+                      be in the format of a URL
+                    type: string
+                type: object
+              content:
+                description: Content - The contents of the API. The value is a string
+                  containing the content of the API.
+                type: string
+              contentFormat:
+                default: openapi+json
+                description: ContentFormat - Format of the Content in which the API
+                  is getting imported.
+                type: string
+              description:
+                description: Description - Description of the API. May include its
+                  purpose, where to get more information, and other relevant information.
+                type: string
+              displayName:
+                description: |-
+                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                  DisplayName - The display name of the API. This name is used by the developer portal as the API name.
+                type: string
+              path:
+                description: Path - API prefix. The value is combined with the API
+                  version to form the URL of the API endpoint.
+                type: string
+              products:
+                description: Products - Products that the API is associated with.
+                  Products are groups of APIs.
+                items:
+                  type: string
+                type: array
+              serviceURL:
+                description: ServiceURL - Absolute URL of the backend service implementing
+                  this API. Cannot be more than 2000 characters long.
+                type: string
+              subscriptionRequired:
+                default: true
+                description: SubscriptionRquired - Indicates if subscription is required
+                  to access the API. Default value is true.
+                type: boolean
+            required:
+            - content
+            - contentFormat
+            - description
+            - displayName
+            - path
+            - serviceURL
+            - subscriptionRequired
+            type: object
+          status:
+            description: ProductApiStatus defines the observed state of ProductApi
+            properties:
+              pollerToken:
+                description: ResumeToken - The token used to track long-running operations.
+                type: string
+              provisioningState:
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                  ProvisioningState - The provisioning state of the API. Possible values are: Creating, Succeeded, Failed, Updating, Deleting, and Deleted.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
