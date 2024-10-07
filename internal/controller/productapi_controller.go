@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	apim "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/apimanagement/armapimanagement/v2"
-	"github.com/go-logr/logr"
 	apimv1alpha1 "github.com/tjololo/stilas-az/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -129,10 +128,11 @@ func (r *ProductApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 		}
 	}
-	return createApimApi(ctx, apimanagementClientFactory, productApi, logger, err, resourcesGroup, apimName, r)
+	return createApimApi(ctx, apimanagementClientFactory, productApi, err, resourcesGroup, apimName, r)
 }
 
-func createApimApi(ctx context.Context, apimanagementClientFactory *apim.ClientFactory, productApi apimv1alpha1.ProductApi, logger logr.Logger, err error, resourcesGroup string, apimName string, r *ProductApiReconciler) (ctrl.Result, error) {
+func createApimApi(ctx context.Context, apimanagementClientFactory *apim.ClientFactory, productApi apimv1alpha1.ProductApi, err error, resourcesGroup string, apimName string, r *ProductApiReconciler) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 	apimClient := apimanagementClientFactory.NewAPIClient()
 	resumeToken := productApi.Status.ResumeToken
 	logger.Info("Creating or updating API")

@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "groupversion_info.go",
         "productapi_types.go",
+        "productapiversion_types.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "github.com/tjololo/stilas-az/api/v1alpha1",
