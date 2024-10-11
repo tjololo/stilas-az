@@ -10,7 +10,8 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//api/v1alpha1",
-        "@com_github_azure_azure_sdk_for_go_sdk_azidentity//:azidentity",
+        "//internal/azure",
+        "//internal/utils",
         "@com_github_azure_azure_sdk_for_go_sdk_resourcemanager_apimanagement_armapimanagement_v2//:armapimanagement",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/runtime",

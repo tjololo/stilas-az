@@ -19,9 +19,10 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	apim "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/apimanagement/armapimanagement/v2"
 	apimv1alpha1 "github.com/tjololo/stilas-az/api/v1alpha1"
+	"github.com/tjololo/stilas-az/internal/azure"
+	"github.com/tjololo/stilas-az/internal/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"os"
@@ -35,7 +36,8 @@ import (
 // ProductApiReconciler reconciles a ProductApi object
 type ProductApiReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme     *runtime.Scheme
+	apimClient *azure.APIMClient
 }
 
 // +kubebuilder:rbac:groups=apim.azure.stilas.418.cloud,resources=productapis,verbs=get;list;watch;create;update;patch;delete
@@ -63,25 +65,22 @@ func (r *ProductApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// on deleted requests.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	if productApi.Status.ProvisioningState == "Succeeded" {
-		logger.Info("Resource already provisioned successfully")
-		return ctrl.Result{}, nil
-	}
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
-	if err != nil {
-		logger.Error(err, "Failed to get Azure credentials")
-		return ctrl.Result{}, err
-	}
+
 	subscriptionID, resourcesGroup, apimName, err := getConfigFromEnv()
 	if err != nil {
 		logger.Error(err, "Failed to get configuration. No reason to requeue")
 		return ctrl.Result{}, nil
 	}
-	apimanagementClientFactory, err := apim.NewClientFactory(subscriptionID, cred, nil)
+	r.apimClient, err = azure.NewAPIMClient(azure.ApimClientConfig{
+		SubscriptionId:  subscriptionID,
+		ResourceGroup:   resourcesGroup,
+		ApimServiceName: apimName,
+	})
 	if err != nil {
-		logger.Error(err, "Failed to create apimanagement client factory")
+		logger.Error(err, "Failed to create APIM client")
 		return ctrl.Result{}, err
 	}
+
 	if productApi.Spec.ApiVersion != "" {
 		var productApiVersion apimv1alpha1.ProductApiVersion
 		if err := r.Get(ctx, client.ObjectKey{Namespace: productApi.Namespace, Name: productApi.Name}, &productApiVersion); err != nil {
@@ -89,31 +88,7 @@ func (r *ProductApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				logger.Error(err, "Failed to get product api version")
 				return ctrl.Result{}, err
 			}
-			productApiVersion = apimv1alpha1.ProductApiVersion{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      productApi.Name,
-					Namespace: productApi.Namespace,
-				},
-				Spec: apimv1alpha1.ProductApiVersionSpec{
-					Name:             productApi.Spec.DisplayName,
-					VersioningScheme: *productApi.Spec.ApiVersionScheme,
-				},
-			}
-			if err := controllerutil.SetControllerReference(&productApi, &productApiVersion, r.Scheme); err != nil {
-				logger.Error(err, "Failed to set controller reference")
-				return ctrl.Result{}, err
-			}
-			if err := r.Create(ctx, &productApiVersion); err != nil {
-				logger.Error(err, "Failed to create product api version")
-				return ctrl.Result{}, err
-			}
-			productApi.Status.ProvisioningState = "Provisioning"
-			if err := r.Status().Update(ctx, &productApi); err != nil {
-				logger.Error(err, "Failed to update status")
-				return ctrl.Result{}, err
-			}
-			logger.Info("Product API Version created. Requeuing")
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			return r.createApimApiVersionSet(ctx, productApi)
 		} else {
 			if productApiVersion.Status.ProvisioningState != "Succeeded" {
 				logger.Info("Product API Version not yet provisioned. Requeuing")
@@ -128,12 +103,57 @@ func (r *ProductApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 		}
 	}
-	return createApimApi(ctx, apimanagementClientFactory, productApi, err, resourcesGroup, apimName, r)
+
+	_, err = r.apimClient.GetApi(ctx, fmt.Sprintf("%s-%s", productApi.Namespace, productApi.Name), nil)
+	if azure.IgnoreNotFound(err) != nil {
+		logger.Error(err, "Failed to get API")
+		return ctrl.Result{}, err
+	} else if azure.IsNotFoundError(err) {
+		return r.createUpdateApimApi(ctx, productApi)
+	}
+	specSha, err := utils.Sha256FromUrlContent(*productApi.Spec.Content)
+	if err != nil {
+		logger.Error(err, "Failed to get content sha")
+		return ctrl.Result{}, err
+	}
+	if specSha != productApi.Status.LastAppliedSpecSha {
+		return r.createUpdateApimApi(ctx, productApi)
+	}
+	logger.Info("No changes detected. Requeuing after 10 minutes")
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 
-func createApimApi(ctx context.Context, apimanagementClientFactory *apim.ClientFactory, productApi apimv1alpha1.ProductApi, err error, resourcesGroup string, apimName string, r *ProductApiReconciler) (ctrl.Result, error) {
+func (r *ProductApiReconciler) createApimApiVersionSet(ctx context.Context, productApi apimv1alpha1.ProductApi) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	apimClient := apimanagementClientFactory.NewAPIClient()
+	productApiVersion := apimv1alpha1.ProductApiVersion{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      productApi.Name,
+			Namespace: productApi.Namespace,
+		},
+		Spec: apimv1alpha1.ProductApiVersionSpec{
+			Name:             productApi.Spec.DisplayName,
+			VersioningScheme: *productApi.Spec.ApiVersionScheme,
+		},
+	}
+	if err := controllerutil.SetControllerReference(&productApi, &productApiVersion, r.Scheme); err != nil {
+		logger.Error(err, "Failed to set controller reference")
+		return ctrl.Result{}, err
+	}
+	if err := r.Create(ctx, &productApiVersion); err != nil {
+		logger.Error(err, "Failed to create product api version")
+		return ctrl.Result{}, err
+	}
+	productApi.Status.ProvisioningState = "Provisioning"
+	if err := r.Status().Update(ctx, &productApi); err != nil {
+		logger.Error(err, "Failed to update status")
+		return ctrl.Result{}, err
+	}
+	logger.Info("Product API Version created. Requeuing")
+	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
+func (r *ProductApiReconciler) createUpdateApimApi(ctx context.Context, productApi apimv1alpha1.ProductApi) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 	resumeToken := productApi.Status.ResumeToken
 	logger.Info("Creating or updating API")
 	apimApiParams := apim.APICreateOrUpdateParameter{
@@ -155,67 +175,42 @@ func createApimApi(ctx context.Context, apimanagementClientFactory *apim.ClientF
 		apimApiParams.Properties.APIVersionSetID = toPointer(productApi.Annotations["apim.azure.stilas.418.cloud/productapiversion"])
 		apimApiParams.Properties.APIVersion = &productApi.Spec.ApiVersion
 	}
-	poller, err := apimClient.BeginCreateOrUpdate(
+	poller, err := r.apimClient.CreateUpdateApi(
 		ctx,
-		resourcesGroup,
-		apimName,
 		fmt.Sprintf("%s-%s", productApi.Namespace, productApi.Name),
 		apimApiParams,
 		&apim.APIClientBeginCreateOrUpdateOptions{ResumeToken: resumeToken})
 
 	logger.Info("Watching LR operation")
+	done, _, token, err := azure.StartResumeOperation(ctx, poller)
 	if err != nil {
-		logger.Error(err, "Failed begin create/update operation")
-		return ctrl.Result{}, err
-	}
-	if resumeToken == "" {
-		logger.Info("Resume token not registered, registering")
-		res, err := poller.Poll(ctx)
-		if res != nil {
-			logger.Info(fmt.Sprintf("Polling result: %s - %s", res.Status, res.Body))
-		}
-		if err != nil {
-			logger.Error(err, "Failed to Poll operation")
-			return ctrl.Result{}, err
-		}
-		token, err := poller.ResumeToken()
-		if err != nil {
-			logger.Error(err, "Failed to get resume token")
-			return ctrl.Result{}, err
-		}
-		productApi.Status.ResumeToken = token
-		productApi.Status.ProvisioningState = "Provisioning"
+		logger.Error(err, "Failed to watch LR operation")
+		productApi.Status.ResumeToken = ""
+		productApi.Status.ProvisioningState = "Failed"
 		err = r.Status().Update(ctx, &productApi)
 		if err != nil {
 			logger.Error(err, "Failed to update status")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
-	logger.Info("Resuming operation")
-	_, err = poller.Poll(ctx)
-	if err != nil {
-		logger.Error(err, "Failed to Poll operation")
 		return ctrl.Result{}, err
 	}
 
-	if poller.Done() {
+	if done {
 		logger.Info("Operation completed")
 		productApi.Status.ResumeToken = ""
 		productApi.Status.ProvisioningState = "Succeeded"
+		if *productApi.Spec.ContentFormat == apimv1alpha1.ContentFormatOpenapiJSONLink {
+			productApi.Status.LastAppliedSpecSha, err = utils.Sha256FromUrlContent(*productApi.Spec.Content)
+		}
 		err = r.Status().Update(ctx, &productApi)
 		if err != nil {
 			logger.Error(err, "Failed to update status")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	} else {
 		productApi.Status.ProvisioningState = "Provisioning"
-		productApi.Status.ResumeToken, err = poller.ResumeToken()
-		if err != nil {
-			logger.Error(err, "Failed to get resume token")
-			return ctrl.Result{}, err
-		}
+		productApi.Status.ResumeToken = token
 		err = r.Status().Update(ctx, &productApi)
 		if err != nil {
 			logger.Error(err, "Failed to update status")

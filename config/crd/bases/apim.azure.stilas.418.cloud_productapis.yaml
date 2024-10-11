@@ -126,6 +126,9 @@ spec:
           status:
             description: ProductApiStatus defines the observed state of ProductApi
             properties:
+              lastAppliedSpecSha:
+                description: LastAppliedSpecSha - The sha256 of the last applied spec.
+                type: string
               pollerToken:
                 description: ResumeToken - The token used to track long-running operations.
                 type: string

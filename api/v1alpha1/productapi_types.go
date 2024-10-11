@@ -83,6 +83,9 @@ type ProductApiStatus struct {
 	//ResumeToken - The token used to track long-running operations.
 	//+kubebuilder:validation:Optional
 	ResumeToken string `json:"pollerToken,omitempty"`
+	//LastAppliedSpecSha - The sha256 of the last applied spec.
+	//+kubebuilder:validation:Optional
+	LastAppliedSpecSha string `json:"lastAppliedSpecSha,omitempty"`
 }
 
 // +kubebuilder:object:root=true

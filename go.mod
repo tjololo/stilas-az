@@ -3,6 +3,7 @@ module github.com/tjololo/stilas-az
 go 1.22.0
 
 require (
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.9.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.4.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/apimanagement/armapimanagement/v2 v2.1.0
 	github.com/onsi/ginkgo/v2 v2.20.1
@@ -13,7 +14,6 @@ require (
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.9.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.5.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
