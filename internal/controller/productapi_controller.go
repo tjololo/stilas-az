@@ -190,7 +190,6 @@ func (r *ProductApiReconciler) createUpdateApimApi(ctx context.Context, productA
 		err = r.Status().Update(ctx, &productApi)
 		if err != nil {
 			logger.Error(err, "Failed to update status")
-			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, err
 	}

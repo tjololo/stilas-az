@@ -52,12 +52,13 @@ func (r *ProductApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	logger := log.FromContext(ctx)
 	var productApiVersion apimv1alpha1.ProductApiVersion
 	if err := r.Get(ctx, req.NamespacedName, &productApiVersion); err != nil {
-		logger.Error(err, "unable to fetch CronJob")
+		logger.Error(err, "unable to fetch ProductApiVersion")
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can get them
 		// on deleted requests.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	logger.Info("Reconciling ProductApiVersion")
 	subscriptionID, resourcesGroup, apimName, err := getConfigFromEnv()
 	if err != nil {
 		logger.Error(err, "Failed to get configuration. No reason to requeue")
@@ -72,7 +73,8 @@ func (r *ProductApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		logger.Error(err, "Failed to create APIM client")
 		return ctrl.Result{}, err
 	}
-	_, err = apimClient.GetApiVersionSet(ctx, productApiVersion.Spec.Name, nil)
+	var resId *string
+	getRes, err := apimClient.GetApiVersionSet(ctx, productApiVersion.Spec.Name, nil)
 	if azure.IsNotFoundError(err) {
 		result, err := apimClient.CreateUpdateApiVersionSet(
 			ctx,
@@ -89,19 +91,24 @@ func (r *ProductApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 		if err != nil {
 			logger.Error(err, "Failed to create or update API version")
-			return ctrl.Result{RequeueAfter: 5 * time.Minute}, err
+			return ctrl.Result{}, err
 		}
-		if result.ID == nil {
-			logger.Info("No result returned")
-			return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
-		}
+		resId = result.ID
+	} else {
+		resId = getRes.ID
+	}
+	if resId == nil {
+		logger.Info("No result returned")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
 
-		productApiVersion.Status.ProvisioningState = "Succeeded"
-		productApiVersion.Status.ApiVersionSetID = *result.ID
+	productApiVersion.Status.ProvisioningState = "Succeeded"
+	productApiVersion.Status.ApiVersionSetID = *resId
 
-		err = r.Status().Update(ctx, &productApiVersion)
-
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, err
+	err = r.Status().Update(ctx, &productApiVersion)
+	if err != nil {
+		logger.Error(err, "Failed to update status of product api version")
+		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 
