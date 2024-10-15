@@ -53,6 +53,11 @@ func (c *APIMClient) CreateUpdateApiVersionSet(ctx context.Context, apiVersionSe
 	return client.CreateOrUpdate(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, apiVersionSetName, parameters, options)
 }
 
+func (c *APIMClient) DeleteApiVersionSet(ctx context.Context, apiVersionSetName string, etag string, options *apim.APIVersionSetClientDeleteOptions) (apim.APIVersionSetClientDeleteResponse, error) {
+	client := c.apimClientFactory.NewAPIVersionSetClient()
+	return client.Delete(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, apiVersionSetName, etag, options)
+}
+
 func (c *APIMClient) GetApi(ctx context.Context, apiId string, options *apim.APIClientGetOptions) (apim.APIClientGetResponse, error) {
 	client := c.apimClientFactory.NewAPIClient()
 	return client.Get(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, apiId, options)
@@ -61,6 +66,11 @@ func (c *APIMClient) GetApi(ctx context.Context, apiId string, options *apim.API
 func (c *APIMClient) CreateUpdateApi(ctx context.Context, apiId string, parameters apim.APICreateOrUpdateParameter, options *apim.APIClientBeginCreateOrUpdateOptions) (*runtime.Poller[apim.APIClientCreateOrUpdateResponse], error) {
 	client := c.apimClientFactory.NewAPIClient()
 	return client.BeginCreateOrUpdate(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, apiId, parameters, options)
+}
+
+func (c *APIMClient) DeleteApi(ctx context.Context, apiId string, etag string, options *apim.APIClientDeleteOptions) (apim.APIClientDeleteResponse, error) {
+	client := c.apimClientFactory.NewAPIClient()
+	return client.Delete(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, apiId, etag, options)
 }
 
 func IsNotFoundError(err error) bool {

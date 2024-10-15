@@ -22,6 +22,7 @@ import (
 	apim "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/apimanagement/armapimanagement/v2"
 	"github.com/tjololo/stilas-az/internal/azure"
 	"github.com/tjololo/stilas-az/internal/utils"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,6 +63,13 @@ func (r *ApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// on deleted requests.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	if !controllerutil.ContainsFinalizer(&apiVersion, "apiversion.finalizers.stilas.418.cloud") {
+		controllerutil.AddFinalizer(&apiVersion, "apiversion.finalizers.stilas.418.cloud")
+		if err := r.Update(ctx, &apiVersion); err != nil {
+			logger.Error(err, "Failed to add finalizer")
+			return ctrl.Result{}, err
+		}
+	}
 	subscriptionID, resourcesGroup, apimName, err := getConfigFromEnv()
 	if err != nil {
 		logger.Error(err, "Failed to get configuration. No reason to requeue")
@@ -77,6 +85,9 @@ func (r *ApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 	_, err = r.apimClient.GetApi(ctx, getApiVersionName(apiVersion), nil)
+	if apiVersion.DeletionTimestamp != nil {
+		return r.deleteApiVersion(ctx, apiVersion)
+	}
 	if azure.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to get API")
 		return ctrl.Result{}, err
@@ -109,23 +120,7 @@ func (r *ApiVersionReconciler) createUpdateApimApi(ctx context.Context, apiVesri
 	logger := log.FromContext(ctx)
 	resumeToken := apiVesrion.Status.ResumeToken
 	logger.Info("Creating or updating API")
-	apimApiParams := apim.APICreateOrUpdateParameter{
-		Properties: &apim.APICreateOrUpdateProperties{
-			Path:                 &apiVesrion.Spec.Path,
-			APIType:              apiVesrion.Spec.APIType.AzureApiType(),
-			Contact:              apiVesrion.Spec.Contact.AzureAPIContactInformation(),
-			Description:          &apiVesrion.Spec.Description,
-			DisplayName:          &apiVesrion.Spec.DisplayName,
-			Format:               apiVesrion.Spec.ContentFormat.AzureContentFormat(),
-			IsCurrent:            toPointer(true),
-			Protocols:            []*apim.Protocol{toPointer(apim.ProtocolHTTPS)},
-			ServiceURL:           &apiVesrion.Spec.ServiceUrl,
-			SubscriptionRequired: apiVesrion.Spec.SubscriptionRequired,
-			Value:                apiVesrion.Spec.Content,
-			APIVersionSetID:      toPointer(apiVesrion.Spec.ApiVersionSetId),
-			APIVersion:           apiVesrion.Spec.Name,
-		},
-	}
+	apimApiParams := apiVersionToUpdateParameter(apiVesrion)
 	poller, err := r.apimClient.CreateUpdateApi(
 		ctx,
 		getApiVersionName(apiVesrion),
@@ -169,4 +164,41 @@ func (r *ApiVersionReconciler) createUpdateApimApi(ctx context.Context, apiVesri
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	}
 	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+}
+
+func apiVersionToUpdateParameter(apiVesrion apimv1alpha1.ApiVersion) apim.APICreateOrUpdateParameter {
+	return apim.APICreateOrUpdateParameter{
+		Properties: &apim.APICreateOrUpdateProperties{
+			Path:                 &apiVesrion.Spec.Path,
+			APIType:              apiVesrion.Spec.APIType.AzureApiType(),
+			Contact:              apiVesrion.Spec.Contact.AzureAPIContactInformation(),
+			Description:          &apiVesrion.Spec.Description,
+			DisplayName:          &apiVesrion.Spec.DisplayName,
+			Format:               apiVesrion.Spec.ContentFormat.AzureContentFormat(),
+			IsCurrent:            toPointer(true),
+			Protocols:            []*apim.Protocol{toPointer(apim.ProtocolHTTPS)},
+			ServiceURL:           &apiVesrion.Spec.ServiceUrl,
+			SubscriptionRequired: apiVesrion.Spec.SubscriptionRequired,
+			Value:                apiVesrion.Spec.Content,
+			APIVersionSetID:      toPointer(apiVesrion.Spec.ApiVersionSetId),
+			APIVersion:           apiVesrion.Spec.Name,
+		},
+	}
+}
+
+func (r *ApiVersionReconciler) deleteApiVersion(ctx context.Context, apiVersion apimv1alpha1.ApiVersion) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	logger.Info("Deleting APIVersion")
+	_, err := r.apimClient.DeleteApi(ctx, getApiVersionName(apiVersion), "*", nil)
+	if err != nil {
+		logger.Error(err, "Failed to delete APIVersion")
+		return ctrl.Result{}, err
+	}
+	controllerutil.RemoveFinalizer(&apiVersion, "apiversion.finalizers.stilas.418.cloud")
+	err = r.Update(ctx, &apiVersion)
+	if err != nil {
+		logger.Error(err, "Failed to remove finalizer")
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
 }

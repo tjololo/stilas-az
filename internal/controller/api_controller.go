@@ -63,6 +63,14 @@ func (r *ApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		// on deleted requests.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	if !controllerutil.ContainsFinalizer(&api, "api.finalizers.stilas.418.cloud") {
+		controllerutil.AddFinalizer(&api, "api.finalizers.stilas.418.cloud")
+		err := r.Update(ctx, &api)
+		if err != nil {
+			logger.Error(err, "Failed to add finalizer")
+			return ctrl.Result{}, err
+		}
+	}
 	logger.Info("Reconciling Api")
 	subscriptionID, resourcesGroup, apimName, err := getConfigFromEnv()
 	if err != nil {
@@ -78,8 +86,50 @@ func (r *ApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		logger.Error(err, "Failed to create APIM client")
 		return ctrl.Result{}, err
 	}
-	var resId *string
 	apiName := getApiName(&api)
+	if api.DeletionTimestamp != nil {
+		logger.Info("Deleting API")
+		//Get all owned resources and delete them first
+		var versions apimv1alpha1.ApiVersionList
+		apiVersionErr := r.List(ctx, &versions, client.InNamespace(api.Namespace), client.MatchingFields{"metadata.ownerReferences.uid": string(api.GetUID())})
+		if client.IgnoreNotFound(apiVersionErr) != nil {
+			logger.Error(err, "Failed to list owned resources")
+			return ctrl.Result{}, apiVersionErr
+		}
+		for _, version := range versions.Items {
+			deleteErr := r.Delete(ctx, &version)
+			if deleteErr != nil {
+				logger.Error(err, "Failed to delete owned resource")
+				return ctrl.Result{}, deleteErr
+			}
+		}
+		if versions.Items != nil && len(versions.Items) > 0 {
+			logger.Info("Waiting for owned resources to be deleted")
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+		_, err = apimClient.GetApiVersionSet(ctx, apiName, nil)
+		if azure.IgnoreNotFound(err) != nil {
+			logger.Error(err, "Failed to get API")
+			return ctrl.Result{}, err
+		}
+		if err == nil {
+			_, err = apimClient.DeleteApiVersionSet(ctx, apiName, "*", nil)
+			if err != nil {
+				logger.Error(err, "Failed to delete API")
+				return ctrl.Result{}, err
+			}
+		}
+		controllerutil.RemoveFinalizer(&api, "api.finalizers.stilas.418.cloud")
+		err = r.Update(ctx, &api)
+		if err != nil {
+			logger.Error(err, "Failed to remove finalizer")
+			return ctrl.Result{}, err
+		}
+		logger.Info("API deleted")
+		return ctrl.Result{}, nil
+	}
+	var resId *string
+
 	getRes, err := apimClient.GetApiVersionSet(ctx, apiName, nil)
 	if azure.IsNotFoundError(err) {
 		result, err := apimClient.CreateUpdateApiVersionSet(
@@ -100,6 +150,9 @@ func (r *ApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			return ctrl.Result{}, err
 		}
 		resId = result.ID
+	} else if err != nil {
+		logger.Error(err, "Failed to get API version")
+		return ctrl.Result{}, err
 	} else {
 		resId = getRes.ID
 	}
@@ -125,6 +178,18 @@ func (r *ApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ApiReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Create an index for the ownerReferences.uid field
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &apimv1alpha1.ApiVersion{}, "metadata.ownerReferences.uid", func(rawObj client.Object) []string {
+		// Extract the owner UID from the ownerReferences
+		apiVersion := rawObj.(*apimv1alpha1.ApiVersion)
+		ownerRefs := apiVersion.GetOwnerReferences()
+		if len(ownerRefs) == 0 {
+			return nil
+		}
+		return []string{string(ownerRefs[0].UID)}
+	}); err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apimv1alpha1.Api{}).
 		Owns(&apimv1alpha1.ApiVersion{}).
