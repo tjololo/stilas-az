@@ -182,8 +182,10 @@ func (r *ProductApiReconciler) createUpdateApimApi(ctx context.Context, productA
 		&apim.APIClientBeginCreateOrUpdateOptions{ResumeToken: resumeToken})
 
 	logger.Info("Watching LR operation")
-	done, _, token, err := azure.StartResumeOperation(ctx, poller)
-	if err != nil {
+	status, _, token, err := azure.StartResumeOperation(ctx, poller)
+
+	switch status {
+	case azure.OperationStatusFailed:
 		logger.Error(err, "Failed to watch LR operation")
 		productApi.Status.ResumeToken = ""
 		productApi.Status.ProvisioningState = "Failed"
@@ -192,9 +194,16 @@ func (r *ProductApiReconciler) createUpdateApimApi(ctx context.Context, productA
 			logger.Error(err, "Failed to update status")
 		}
 		return ctrl.Result{}, err
-	}
-
-	if done {
+	case azure.OperationStatusInProgress:
+		productApi.Status.ProvisioningState = "Provisioning"
+		productApi.Status.ResumeToken = token
+		err = r.Status().Update(ctx, &productApi)
+		if err != nil {
+			logger.Error(err, "Failed to update status")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	case azure.OperationStatusSucceeded:
 		logger.Info("Operation completed")
 		productApi.Status.ResumeToken = ""
 		productApi.Status.ProvisioningState = "Succeeded"
@@ -207,16 +216,8 @@ func (r *ProductApiReconciler) createUpdateApimApi(ctx context.Context, productA
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
-	} else {
-		productApi.Status.ProvisioningState = "Provisioning"
-		productApi.Status.ResumeToken = token
-		err = r.Status().Update(ctx, &productApi)
-		if err != nil {
-			logger.Error(err, "Failed to update status")
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
+	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
