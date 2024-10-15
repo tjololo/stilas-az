@@ -24,33 +24,25 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ProductApiSpec defines the desired state of ProductApi
-type ProductApiSpec struct {
+// ApiSpec defines the desired state of Api
+type ApiSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
 	//DisplayName - The display name of the API. This name is used by the developer portal as the API name.
 	//+kubebuilder:validation:Required
 	DisplayName string `json:"displayName,omitempty"`
 	//Description - Description of the API. May include its purpose, where to get more information, and other relevant information.
-	//+kubebuilder:validation:Required
-	Description string `json:"description,omitempty"`
-	//ServiceURL - Absolute URL of the backend service implementing this API. Cannot be more than 2000 characters long.
-	//+kubebuilder:validation:Required
-	ServiceURL string `json:"serviceURL,omitempty"`
-	//Path - API prefix. The value is combined with the API version to form the URL of the API endpoint.
-	//+kubebuilder:validation:Required
-	Path string `json:"path,omitempty"`
-	//Products - Products that the API is associated with. Products are groups of APIs.
 	//+kubebuilder:validation:Optional
-	Products []string `json:"products,omitempty"`
-	//Protocols - Describes protocols used by the API. Default value is [https].
-	//+kubebuilder:validation:Optional
-	ApiVersion string `json:"apiVersion,omitempty"`
-	//ApiVersionShceme - Indicates the versioning scheme used for the API. Possible values include, but are not limited to, "Segment", "Query", "Header". Default value is "Segment".
+	Description *string `json:"description,omitempty"`
+	//VersioningScheme - Indicates the versioning scheme used for the API. Possible values include, but are not limited to, "Segment", "Query", "Header". Default value is "Segment".
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:="Segment"
 	//+kubebuilder:validation:Enum:=Header;Query;Segment
-	ApiVersionScheme *APIVersionScheme `json:"apiVersionScheme,omitempty"`
+	VersioningScheme APIVersionScheme `json:"versioningScheme,omitempty"`
+	//Path - API prefix. The value is combined with the API version to form the URL of the API endpoint.
+	//+kubebuilder:validation:Required
+	Path string `json:"path,omitempty"`
 	//ApiType - Type of API.
 	//+kubebuilder:validation:Optional
 	//+kubebuilder:default:="http"
@@ -60,71 +52,50 @@ type ProductApiSpec struct {
 	//Contact - Contact details of the API owner.
 	//+kubebuilder:validation:Optional
 	Contact *APIContactInformation `json:"contact,omitempty"`
-	//ContentFormat - Format of the Content in which the API is getting imported.
+	//Versions - A list of API versions associated with the API. If the API is specified using the OpenAPI definition, then the API version is set by the version field of the OpenAPI definition.
 	//+kubebuilder:validation:Required
-	//+kubebuilder:default:=openapi+json
-	ContentFormat *ContentFormat `json:"contentFormat,omitempty"`
-	//Content - The contents of the API. The value is a string containing the content of the API.
-	//+kubebuilder:validation:Required
-	Content *string `json:"content,omitempty"`
-	//SubscriptionRquired - Indicates if subscription is required to access the API. Default value is true.
-	//+kubebuilder:validation:Required
-	//+kubebuilder:default:=true
-	SubscriptionRequired *bool `json:"subscriptionRequired,omitempty"`
+	Versions []ApiVersionItem `json:"versions,omitempty"`
 }
 
-// ProductApiStatus defines the observed state of ProductApi
-type ProductApiStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+// ApiStatus defines the observed state of Api
+type ApiStatus struct {
 	//ProvisioningState - The provisioning state of the API. Possible values are: Creating, Succeeded, Failed, Updating, Deleting, and Deleted.
 	//+kubebuilder:validation:Optional
 	ProvisioningState string `json:"provisioningState,omitempty"`
-	//ResumeToken - The token used to track long-running operations.
 	//+kubebuilder:validation:Optional
-	ResumeToken string `json:"pollerToken,omitempty"`
-	//LastAppliedSpecSha - The sha256 of the last applied spec.
+	ApiVersionSetID string `json:"apiVersionSetID,omitempty"`
+	//VersionStates - A list of API Version deployed in the API Management service.
 	//+kubebuilder:validation:Optional
-	LastAppliedSpecSha string `json:"lastAppliedSpecSha,omitempty"`
+	VersionStates map[string]ApiVersionStatus `json:"versionStates,omitempty"`
+}
+
+type ApiVersionItem struct {
+	ApiVersionSubSpec `json:",inline"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// ProductApi is the Schema for the productapis API
-type ProductApi struct {
+// Api is the Schema for the apis API
+type Api struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ProductApiSpec   `json:"spec,omitempty"`
-	Status ProductApiStatus `json:"status,omitempty"`
+	Spec   ApiSpec   `json:"spec,omitempty"`
+	Status ApiStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ProductApiList contains a list of ProductApi
-type ProductApiList struct {
+// ApiList contains a list of Api
+type ApiList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ProductApi `json:"items"`
+	Items           []Api `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ProductApi{}, &ProductApiList{})
-}
-
-// APIType - Type of API.
-type APIType string
-
-const (
-	APITypeGraphql   APIType = "graphql"
-	APITypeHTTP      APIType = "http"
-	APITypeWebsocket APIType = "websocket"
-)
-
-func (a APIType) AzureApiType() *apim.APIType {
-	apiType := apim.APIType(a)
-	return &apiType
+	SchemeBuilder.Register(&Api{}, &ApiList{})
 }
 
 // ContentFormat - Format of the Content in which the API is getting imported.
@@ -176,4 +147,45 @@ func (a *APIContactInformation) AzureAPIContactInformation() *apim.APIContactInf
 		Name:  a.Name,
 		URL:   a.URL,
 	}
+}
+
+type APIVersionScheme string
+
+const (
+	// APIVersionSetContractDetailsVersioningSchemeHeader - The API Version is passed in a HTTP header.
+	APIVersionSetContractDetailsVersioningSchemeHeader APIVersionScheme = "Header"
+	// APIVersionSetContractDetailsVersioningSchemeQuery - The API Version is passed in a query parameter.
+	APIVersionSetContractDetailsVersioningSchemeQuery APIVersionScheme = "Query"
+	// APIVersionSetContractDetailsVersioningSchemeSegment - The API Version is passed in a path segment.
+	APIVersionSetContractDetailsVersioningSchemeSegment APIVersionScheme = "Segment"
+)
+
+func (a *APIVersionScheme) AzureAPIVersionScheme() *apim.VersioningScheme {
+	if a == nil {
+		return nil
+	}
+	apiVersionScheme := apim.VersioningScheme(*a)
+	return &apiVersionScheme
+}
+
+func (a *APIVersionScheme) AzureAPIVersionSetContractDetailsVersioningScheme() *apim.APIVersionSetContractDetailsVersioningScheme {
+	if a == nil {
+		return nil
+	}
+	apiVersionScheme := apim.APIVersionSetContractDetailsVersioningScheme(*a)
+	return &apiVersionScheme
+}
+
+// APIType - Type of API.
+type APIType string
+
+const (
+	APITypeGraphql   APIType = "graphql"
+	APITypeHTTP      APIType = "http"
+	APITypeWebsocket APIType = "websocket"
+)
+
+func (a APIType) AzureApiType() *apim.APIType {
+	apiType := apim.APIType(a)
+	return &apiType
 }

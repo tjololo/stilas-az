@@ -14,7 +14,7 @@ resources:
   controller: true
   domain: azure.stilas.418.cloud
   group: apim
-  kind: ProductApi
+  kind: Api
   path: github.com/tjololo/stilas-az/api/v1alpha1
   version: v1alpha1
 - api:
@@ -23,7 +23,7 @@ resources:
   controller: true
   domain: azure.stilas.418.cloud
   group: apim
-  kind: ProductApiVersion
+  kind: ApiVersion
   path: github.com/tjololo/stilas-az/api/v1alpha1
   version: v1alpha1
 version: "3"

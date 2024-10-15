@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
-  name: productapis.apim.azure.stilas.418.cloud
+  name: apiversions.apim.azure.stilas.418.cloud
 spec:
   group: apim.azure.stilas.418.cloud
   names:
-    kind: ProductApi
-    listKind: ProductApiList
-    plural: productapis
-    singular: productapi
+    kind: ApiVersion
+    listKind: ApiVersionList
+    plural: apiversions
+    singular: apiversion
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ProductApi is the Schema for the productapis API
+        description: ApiVersion is the Schema for the apiversions API
         properties:
           apiVersion:
             description: |-
@@ -37,32 +37,16 @@ spec:
           metadata:
             type: object
           spec:
-            description: ProductApiSpec defines the desired state of ProductApi
+            description: ApiVersionSpec defines the desired state of ApiVersion
             properties:
               apiType:
-                default: http
-                description: ApiType - Type of API.
-                enum:
-                - graphql
-                - http
-                - websocket
-                type: string
-              apiVersion:
-                description: Protocols - Describes protocols used by the API. Default
-                  value is [https].
+                description: APIType - Type of API.
                 type: string
               apiVersionScheme:
-                default: Segment
-                description: ApiVersionShceme - Indicates the versioning scheme used
-                  for the API. Possible values include, but are not limited to, "Segment",
-                  "Query", "Header". Default value is "Segment".
-                enum:
-                - Header
-                - Query
-                - Segment
+                type: string
+              apiVersionSetId:
                 type: string
               contact:
-                description: Contact - Contact details of the API owner.
                 properties:
                   email:
                     description: The email address of the contact person/organization.
@@ -86,18 +70,19 @@ spec:
                   is getting imported.
                 type: string
               description:
-                description: Description - Description of the API. May include its
-                  purpose, where to get more information, and other relevant information.
+                description: Description - Description of the API Version. May include
+                  its purpose, where to get more information, and other relevant information.
                 type: string
               displayName:
+                description: DisplayName - The display name of the API Version. This
+                  name is used by the developer portal as the API Version name.
+                type: string
+              name:
                 description: |-
                   INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
                   Important: Run "make" to regenerate code after modifying this file
-                  DisplayName - The display name of the API. This name is used by the developer portal as the API name.
                 type: string
               path:
-                description: Path - API prefix. The value is combined with the API
-                  version to form the URL of the API endpoint.
                 type: string
               products:
                 description: Products - Products that the API is associated with.
@@ -105,9 +90,7 @@ spec:
                 items:
                   type: string
                 type: array
-              serviceURL:
-                description: ServiceURL - Absolute URL of the backend service implementing
-                  this API. Cannot be more than 2000 characters long.
+              serviceUrl:
                 type: string
               subscriptionRequired:
                 default: true
@@ -117,14 +100,11 @@ spec:
             required:
             - content
             - contentFormat
-            - description
             - displayName
-            - path
-            - serviceURL
             - subscriptionRequired
             type: object
           status:
-            description: ProductApiStatus defines the observed state of ProductApi
+            description: ApiVersionStatus defines the observed state of ApiVersion
             properties:
               lastAppliedSpecSha:
                 description: LastAppliedSpecSha - The sha256 of the last applied spec.
@@ -133,10 +113,9 @@ spec:
                 description: ResumeToken - The token used to track long-running operations.
                 type: string
               provisioningState:
-                description: |-
-                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-                  Important: Run "make" to regenerate code after modifying this file
-                  ProvisioningState - The provisioning state of the API. Possible values are: Creating, Succeeded, Failed, Updating, Deleting, and Deleted.
+                description: 'ProvisioningState - The provisioning state of the API.
+                  Possible values are: Creating, Succeeded, Failed, Updating, Deleting,
+                  and Deleted.'
                 type: string
             type: object
         type: object

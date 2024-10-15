@@ -3,9 +3,9 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "v1alpha1",
     srcs = [
+        "api_types.go",
+        "apiversion_types.go",
         "groupversion_info.go",
-        "productapi_types.go",
-        "productapiversion_types.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "github.com/tjololo/stilas-az/api/v1alpha1",

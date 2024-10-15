@@ -30,7 +30,7 @@ import (
 	apimv1alpha1 "github.com/tjololo/stilas-az/api/v1alpha1"
 )
 
-var _ = Describe("ProductApiVersion Controller", func() {
+var _ = Describe("Api Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,13 +40,13 @@ var _ = Describe("ProductApiVersion Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		productapiversion := &apimv1alpha1.ProductApiVersion{}
+		api := &apimv1alpha1.Api{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind ProductApiVersion")
-			err := k8sClient.Get(ctx, typeNamespacedName, productapiversion)
+			By("creating the custom resource for the Kind Api")
+			err := k8sClient.Get(ctx, typeNamespacedName, api)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &apimv1alpha1.ProductApiVersion{
+				resource := &apimv1alpha1.Api{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,16 +59,16 @@ var _ = Describe("ProductApiVersion Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &apimv1alpha1.ProductApiVersion{}
+			resource := &apimv1alpha1.Api{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance ProductApiVersion")
+			By("Cleanup the specific resource instance Api")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &ProductApiVersionReconciler{
+			controllerReconciler := &ApiReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

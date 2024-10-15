@@ -1,9 +1,9 @@
 apiVersion: apim.azure.stilas.418.cloud/v1alpha1
-kind: ProductApiVersion
+kind: ApiVersion
 metadata:
   labels:
     app.kubernetes.io/name: stilas-az
     app.kubernetes.io/managed-by: kustomize
-  name: productapiversion-sample
+  name: apiversion-sample
 spec:
   # TODO(user): Add fields here

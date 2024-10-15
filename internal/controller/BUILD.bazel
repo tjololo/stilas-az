@@ -3,8 +3,8 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "controller",
     srcs = [
-        "productapi_controller.go",
-        "productapiversion_controller.go",
+        "api_controller.go",
+        "apiversion_controller.go",
     ],
     importpath = "github.com/tjololo/stilas-az/internal/controller",
     visibility = ["//:__subpackages__"],
@@ -25,8 +25,8 @@ go_library(
 go_test(
     name = "controller_test",
     srcs = [
-        "productapi_controller_test.go",
-        "productapiversion_controller_test.go",
+        "api_controller_test.go",
+        "apiversion_controller_test.go",
         "suite_test.go",
     ],
     embed = [":controller"],
