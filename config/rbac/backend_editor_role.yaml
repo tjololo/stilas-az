@@ -1,14 +1,15 @@
----
+# permissions for end users to edit backends.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: stilas-az
+    app.kubernetes.io/managed-by: kustomize
+  name: backend-editor-role
 rules:
 - apiGroups:
   - apim.azure.stilas.418.cloud
   resources:
-  - apis
-  - apiversions
   - backends
   verbs:
   - create
@@ -21,18 +22,6 @@ rules:
 - apiGroups:
   - apim.azure.stilas.418.cloud
   resources:
-  - apis/finalizers
-  - apiversions/finalizers
-  - backends/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apim.azure.stilas.418.cloud
-  resources:
-  - apis/status
-  - apiversions/status
   - backends/status
   verbs:
   - get
-  - patch
-  - update
