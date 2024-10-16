@@ -73,6 +73,36 @@ func (c *APIMClient) DeleteApi(ctx context.Context, apiId string, etag string, o
 	return client.Delete(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, apiId, etag, options)
 }
 
+func (c *APIMClient) GetApiPolicy(ctx context.Context, apiId string, options *apim.APIPolicyClientGetOptions) (apim.APIPolicyClientGetResponse, error) {
+	client := c.apimClientFactory.NewAPIPolicyClient()
+	return client.Get(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, apiId, apim.PolicyIDNamePolicy, options)
+}
+
+func (c *APIMClient) CreateUpdateApiPolicy(ctx context.Context, apiId string, parameters apim.PolicyContract, options *apim.APIPolicyClientCreateOrUpdateOptions) (apim.APIPolicyClientCreateOrUpdateResponse, error) {
+	client := c.apimClientFactory.NewAPIPolicyClient()
+	return client.CreateOrUpdate(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, apiId, apim.PolicyIDNamePolicy, parameters, options)
+}
+
+func (c *APIMClient) DeleteApiPolicy(ctx context.Context, apiId string, etag string, options *apim.APIPolicyClientDeleteOptions) (apim.APIPolicyClientDeleteResponse, error) {
+	client := c.apimClientFactory.NewAPIPolicyClient()
+	return client.Delete(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, apiId, apim.PolicyIDNamePolicy, etag, options)
+}
+
+func (c *APIMClient) GetBackend(ctx context.Context, backendId string, options *apim.BackendClientGetOptions) (apim.BackendClientGetResponse, error) {
+	client := c.apimClientFactory.NewBackendClient()
+	return client.Get(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, backendId, options)
+}
+
+func (c *APIMClient) CreateUpdateBackend(ctx context.Context, backendId string, parameters apim.BackendContract, options *apim.BackendClientCreateOrUpdateOptions) (apim.BackendClientCreateOrUpdateResponse, error) {
+	client := c.apimClientFactory.NewBackendClient()
+	return client.CreateOrUpdate(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, backendId, parameters, options)
+}
+
+func (c *APIMClient) DeleteBackend(ctx context.Context, backendId string, etag string, options *apim.BackendClientDeleteOptions) (apim.BackendClientDeleteResponse, error) {
+	client := c.apimClientFactory.NewBackendClient()
+	return client.Delete(ctx, c.ApimClientConfig.ResourceGroup, c.ApimClientConfig.ApimServiceName, backendId, etag, options)
+}
+
 func IsNotFoundError(err error) bool {
 	var responseError *azcore.ResponseError
 	if errors.As(err, &responseError) {

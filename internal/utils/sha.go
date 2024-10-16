@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 func Sha256FromUrlContent(url string) (string, error) {
@@ -19,4 +20,18 @@ func Sha256FromUrlContent(url string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func Sha256FromContent(content string) (string, error) {
+	if isUrl(content) {
+		return Sha256FromUrlContent(content)
+	}
+	h := sha256.New()
+	h.Write([]byte(content))
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func isUrl(s string) bool {
+	_, err := url.ParseRequestURI(s)
+	return err == nil
 }

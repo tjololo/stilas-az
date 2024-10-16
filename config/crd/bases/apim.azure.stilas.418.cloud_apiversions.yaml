@@ -77,6 +77,11 @@ spec:
                 description: DisplayName - The display name of the API Version. This
                   name is used by the developer portal as the API Version name.
                 type: string
+              isCurrent:
+                default: true
+                description: IsCurrent - Indicates if API Version is the current api
+                  version.
+                type: boolean
               name:
                 description: |-
                   INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -84,13 +89,42 @@ spec:
                 type: string
               path:
                 type: string
+              policies:
+                description: Policy - The API Version Policy description.
+                properties:
+                  policyContent:
+                    description: PolicyContent - The contents of the Policy as string.
+                    type: string
+                  policyFormat:
+                    default: xml
+                    description: PolicyFormat - Format of the Policy in which the
+                      API is getting imported.
+                    enum:
+                    - xml
+                    - xml-link
+                    - rawxml
+                    - rawxml-link
+                    type: string
+                required:
+                - policyContent
+                type: object
               products:
                 description: Products - Products that the API is associated with.
                   Products are groups of APIs.
                 items:
                   type: string
                 type: array
+              protocols:
+                default:
+                - https
+                description: Protocols - Describes protocols over which API is made
+                  available.
+                items:
+                  type: string
+                type: array
               serviceUrl:
+                description: ServiceUrl - Absolute URL of the backend service implementing
+                  this API. Cannot be more than 2000 characters long.
                 type: string
               subscriptionRequired:
                 default: true
@@ -106,6 +140,10 @@ spec:
           status:
             description: ApiVersionStatus defines the observed state of ApiVersion
             properties:
+              lastAppliedPolicySha:
+                description: LastAppliedPolicySha - The sha256 of the last applied
+                  policy.
+                type: string
               lastAppliedSpecSha:
                 description: LastAppliedSpecSha - The sha256 of the last applied spec.
                 type: string

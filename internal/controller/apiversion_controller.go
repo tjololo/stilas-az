@@ -92,7 +92,7 @@ func (r *ApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		logger.Error(err, "Failed to get API")
 		return ctrl.Result{}, err
 	} else {
-		latestSha, shaErr := utils.Sha256FromUrlContent(*apiVersion.Spec.Content)
+		latestSha, shaErr := utils.Sha256FromContent(*apiVersion.Spec.Content)
 		if shaErr != nil {
 			logger.Error(err, "Failed to get content sha")
 			return ctrl.Result{}, err
@@ -100,7 +100,17 @@ func (r *ApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if apiVersion.Status.LastAppliedSpecSha != latestSha || azure.IsNotFoundError(err) {
 			return r.createUpdateApimApi(ctx, apiVersion)
 		}
-		logger.Info("No changes detected")
+		lastPolicySha, shaErr := utils.Sha256FromContent(*apiVersion.Spec.Policy.PolicyContent)
+		if shaErr != nil {
+			logger.Error(err, "Failed to get policy sha")
+			return ctrl.Result{}, err
+		}
+		if apiVersion.Spec.Policy != nil && apiVersion.Status.LastAppliedPolicySha != lastPolicySha {
+			if err := r.createUpdatePolicy(ctx, apiVersion); err != nil {
+				logger.Error(err, "Failed to create/update policy")
+				return ctrl.Result{}, err
+			}
+		}
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 }
@@ -127,6 +137,10 @@ func (r *ApiVersionReconciler) createUpdateApimApi(ctx context.Context, apiVesri
 		apimApiParams,
 		&apim.APIClientBeginCreateOrUpdateOptions{ResumeToken: resumeToken})
 
+	if err != nil {
+		logger.Error(err, "Failed to create/update API")
+		return ctrl.Result{}, err
+	}
 	logger.Info("Watching LR operation")
 	status, _, token, err := azure.StartResumeOperation(ctx, poller)
 
@@ -153,9 +167,7 @@ func (r *ApiVersionReconciler) createUpdateApimApi(ctx context.Context, apiVesri
 		logger.Info("Operation completed")
 		apiVesrion.Status.ResumeToken = ""
 		apiVesrion.Status.ProvisioningState = "Succeeded"
-		if *apiVesrion.Spec.ContentFormat == apimv1alpha1.ContentFormatOpenapiJSONLink {
-			apiVesrion.Status.LastAppliedSpecSha, err = utils.Sha256FromUrlContent(*apiVesrion.Spec.Content)
-		}
+		apiVesrion.Status.LastAppliedSpecSha, err = utils.Sha256FromContent(*apiVesrion.Spec.Content)
 		err = r.Status().Update(ctx, &apiVesrion)
 		if err != nil {
 			logger.Error(err, "Failed to update status")
@@ -163,7 +175,44 @@ func (r *ApiVersionReconciler) createUpdateApimApi(ctx context.Context, apiVesri
 		}
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	}
+
 	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+}
+
+func (r *ApiVersionReconciler) createUpdatePolicy(ctx context.Context, apiVersion apimv1alpha1.ApiVersion) error {
+	logger := log.FromContext(ctx)
+	if apiVersion.Spec.Policy == nil {
+		return nil
+	}
+	logger.Info("Creating or updating policy")
+	policy := apiVersion.Spec.Policy
+	policyContent := *policy.PolicyContent
+	policyFormat := policy.PolicyFormat.AzurePolicyFormat()
+	_, err := r.apimClient.CreateUpdateApiPolicy(
+		ctx,
+		getApiVersionName(apiVersion),
+		apim.PolicyContract{
+			Properties: &apim.PolicyContractProperties{
+				Value:  &policyContent,
+				Format: policyFormat,
+			}},
+		nil,
+	)
+	if err != nil {
+		logger.Error(err, "Failed to create/update policy")
+		return err
+	}
+	apiVersion.Status.LastAppliedPolicySha, err = utils.Sha256FromContent(*apiVersion.Spec.Policy.PolicyContent)
+	if err != nil {
+		logger.Error(err, "Failed to get policy sha")
+		return err
+	}
+	err = r.Status().Update(ctx, &apiVersion)
+	if err != nil {
+		logger.Error(err, "Failed to update status")
+		return err
+	}
+	return nil
 }
 
 func apiVersionToUpdateParameter(apiVesrion apimv1alpha1.ApiVersion) apim.APICreateOrUpdateParameter {
@@ -175,9 +224,9 @@ func apiVersionToUpdateParameter(apiVesrion apimv1alpha1.ApiVersion) apim.APICre
 			Description:          &apiVesrion.Spec.Description,
 			DisplayName:          &apiVesrion.Spec.DisplayName,
 			Format:               apiVesrion.Spec.ContentFormat.AzureContentFormat(),
-			IsCurrent:            toPointer(true),
-			Protocols:            []*apim.Protocol{toPointer(apim.ProtocolHTTPS)},
-			ServiceURL:           &apiVesrion.Spec.ServiceUrl,
+			IsCurrent:            apiVesrion.Spec.IsCurrent,
+			Protocols:            apimv1alpha1.ToApimProtocolSlice(apiVesrion.Spec.Protocols),
+			ServiceURL:           apiVesrion.Spec.ServiceUrl,
 			SubscriptionRequired: apiVesrion.Spec.SubscriptionRequired,
 			Value:                apiVesrion.Spec.Content,
 			APIVersionSetID:      toPointer(apiVesrion.Spec.ApiVersionSetId),
@@ -192,6 +241,11 @@ func (r *ApiVersionReconciler) deleteApiVersion(ctx context.Context, apiVersion 
 	_, err := r.apimClient.DeleteApi(ctx, getApiVersionName(apiVersion), "*", nil)
 	if err != nil {
 		logger.Error(err, "Failed to delete APIVersion")
+		return ctrl.Result{}, err
+	}
+	_, err = r.apimClient.DeleteApiPolicy(ctx, getApiVersionName(apiVersion), "*", nil)
+	if err != nil {
+		logger.Error(err, "Failed to delete policy")
 		return ctrl.Result{}, err
 	}
 	controllerutil.RemoveFinalizer(&apiVersion, "apiversion.finalizers.stilas.418.cloud")

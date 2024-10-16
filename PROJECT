@@ -26,4 +26,13 @@ resources:
   kind: ApiVersion
   path: github.com/tjololo/stilas-az/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: azure.stilas.418.cloud
+  group: apim
+  kind: Backend
+  path: github.com/tjololo/stilas-az/api/v1alpha1
+  version: v1alpha1
 version: "3"

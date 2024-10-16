@@ -1,0 +1,13 @@
+apiVersion: apim.azure.stilas.418.cloud/v1alpha1
+kind: Backend
+metadata:
+  labels:
+    app.kubernetes.io/name: stilas-az
+    app.kubernetes.io/managed-by: kustomize
+  name: backend-sample
+spec:
+  title: "Sample Backend"
+  description: "This is a sample backend"
+  url: "https://api.example.com"
+  validateCertificateChain: true # Default is true
+  validateCertificateName: true # Default is true

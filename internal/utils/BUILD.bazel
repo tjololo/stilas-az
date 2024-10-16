@@ -2,7 +2,10 @@ load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "utils",
-    srcs = ["sha.go"],
+    srcs = [
+        "sha.go",
+        "types.go",
+    ],
     importpath = "github.com/tjololo/stilas-az/internal/utils",
     visibility = ["//:__subpackages__"],
 )

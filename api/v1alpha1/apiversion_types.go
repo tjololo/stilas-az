@@ -45,7 +45,9 @@ type ApiVersionSubSpec struct {
 	//Description - Description of the API Version. May include its purpose, where to get more information, and other relevant information.
 	//+kubebuilder:validation:Optional
 	Description string `json:"description,omitempty"`
-	ServiceUrl  string `json:"serviceUrl,omitempty"`
+	//ServiceUrl - Absolute URL of the backend service implementing this API. Cannot be more than 2000 characters long.
+	//+kubebuilder:validation:Optional
+	ServiceUrl *string `json:"serviceUrl,omitempty"`
 	//Products - Products that the API is associated with. Products are groups of APIs.
 	//+kubebuilder:validation:Optional
 	Products []string `json:"products,omitempty"`
@@ -60,6 +62,29 @@ type ApiVersionSubSpec struct {
 	//+kubebuilder:validation:Required
 	//+kubebuilder:default:=true
 	SubscriptionRequired *bool `json:"subscriptionRequired,omitempty"`
+	//Protocols - Describes protocols over which API is made available.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:={https}
+	Protocols []Protocol `json:"protocols,omitempty"`
+	//IsCurrent - Indicates if API Version is the current api version.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=true
+	IsCurrent *bool `json:"isCurrent,omitempty"`
+	//Policy - The API Version Policy description.
+	//+kubebuilder:validation:Optional
+	Policy *ApiPolicySpec `json:"policies,omitempty"`
+}
+
+// ApiPolicySpec defines the desired state of ApiVersion
+type ApiPolicySpec struct {
+	//PolicyContent - The contents of the Policy as string.
+	//+kubebuilder:validation:Required
+	PolicyContent *string `json:"policyContent,omitempty"`
+	//PolicyFormat - Format of the Policy in which the API is getting imported.
+	//+kubebuilder:validation:Optional
+	//+kubebuilder:default:=xml
+	//+kubebuilder:validation:Enum:=xml;xml-link;rawxml;rawxml-link
+	PolicyFormat *PolicyFormat `json:"policyFormat,omitempty"`
 }
 
 // ApiVersionStatus defines the observed state of ApiVersion
@@ -73,6 +98,9 @@ type ApiVersionStatus struct {
 	//LastAppliedSpecSha - The sha256 of the last applied spec.
 	//+kubebuilder:validation:Optional
 	LastAppliedSpecSha string `json:"lastAppliedSpecSha,omitempty"`
+	//LastAppliedPolicySha - The sha256 of the last applied policy.
+	//+kubebuilder:validation:Optional
+	LastAppliedPolicySha string `json:"lastAppliedPolicySha,omitempty"`
 }
 
 // +kubebuilder:object:root=true

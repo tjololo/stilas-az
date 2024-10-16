@@ -221,7 +221,7 @@ func (r *ApiReconciler) reconcileVersions(ctx context.Context, api *apimv1alpha1
 					ApiVersionScheme:  api.Spec.VersioningScheme,
 					Path:              api.Spec.Path,
 					APIType:           api.Spec.ApiType,
-					ApiVersionSubSpec: version.ApiVersionSubSpec,
+					ApiVersionSubSpec: version,
 				},
 			}
 			if err := controllerutil.SetControllerReference(api, &apiVersion, r.Scheme); err != nil {

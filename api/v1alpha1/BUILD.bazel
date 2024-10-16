@@ -3,14 +3,17 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "v1alpha1",
     srcs = [
+        "api_enums.go",
         "api_types.go",
         "apiversion_types.go",
+        "backend_types.go",
         "groupversion_info.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "github.com/tjololo/stilas-az/api/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [
+        "//internal/utils",
         "@com_github_azure_azure_sdk_for_go_sdk_resourcemanager_apimanagement_armapimanagement_v2//:armapimanagement",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/runtime",
