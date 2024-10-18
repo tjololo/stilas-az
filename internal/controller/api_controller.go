@@ -57,10 +57,9 @@ func (r *ApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	logger := log.FromContext(ctx)
 	var api apimv1alpha1.Api
 	if err := r.Get(ctx, req.NamespacedName, &api); err != nil {
-		logger.Error(err, "unable to fetch Api")
-		// we'll ignore not-found errors, since they can't be fixed by an immediate
-		// requeue (we'll need to wait for a new notification), and we can get them
-		// on deleted requests.
+		if client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "unable to fetch Api")
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if !controllerutil.ContainsFinalizer(&api, "api.finalizers.stilas.418.cloud") {
@@ -173,7 +172,7 @@ func (r *ApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		logger.Error(err, "Failed to update status of product api version")
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -210,20 +209,7 @@ func (r *ApiReconciler) reconcileVersions(ctx context.Context, api *apimv1alpha1
 				logger.Error(err, "Failed to get product api version")
 				return err
 			}
-			apiVersion = apimv1alpha1.ApiVersion{
-				TypeMeta: metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      versionName,
-					Namespace: api.Namespace,
-				},
-				Spec: apimv1alpha1.ApiVersionSpec{
-					ApiVersionSetId:   api.Status.ApiVersionSetID,
-					ApiVersionScheme:  api.Spec.VersioningScheme,
-					Path:              api.Spec.Path,
-					APIType:           api.Spec.ApiType,
-					ApiVersionSubSpec: version,
-				},
-			}
+			apiVersion = createApiVersionResource(versionName, api, version)
 			if err := controllerutil.SetControllerReference(api, &apiVersion, r.Scheme); err != nil {
 				logger.Error(err, "Failed to set controller reference")
 				return err
@@ -234,6 +220,14 @@ func (r *ApiReconciler) reconcileVersions(ctx context.Context, api *apimv1alpha1
 			}
 			continue
 		} else {
+			if newApi := createApiVersionResource(versionName, api, version); apiVersion.RequireUpdate(newApi) {
+				logger.Info("Updating product api version")
+				apiVersion.Spec = newApi.Spec
+				if err := r.Update(ctx, &apiVersion); err != nil {
+					logger.Error(err, "Failed to update product api version")
+					return err
+				}
+			}
 			if api.Status.VersionStates == nil {
 				api.Status.VersionStates = make(map[string]apimv1alpha1.ApiVersionStatus)
 			}
@@ -242,6 +236,23 @@ func (r *ApiReconciler) reconcileVersions(ctx context.Context, api *apimv1alpha1
 	}
 
 	return nil
+}
+
+func createApiVersionResource(versionName string, api *apimv1alpha1.Api, version apimv1alpha1.ApiVersionSubSpec) apimv1alpha1.ApiVersion {
+	return apimv1alpha1.ApiVersion{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      versionName,
+			Namespace: api.Namespace,
+		},
+		Spec: apimv1alpha1.ApiVersionSpec{
+			ApiVersionSetId:   api.Status.ApiVersionSetID,
+			ApiVersionScheme:  api.Spec.VersioningScheme,
+			Path:              api.Spec.Path,
+			APIType:           api.Spec.ApiType,
+			ApiVersionSubSpec: version,
+		},
+	}
 }
 
 func getApiName(api *apimv1alpha1.Api) string {

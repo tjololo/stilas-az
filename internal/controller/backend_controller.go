@@ -107,7 +107,7 @@ func (r *BackendReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if backend.DeletionTimestamp != nil {
 		logger.Info("Deleting backend")
 		_, err := r.apimClient.DeleteBackend(ctx, getBackendName(backend), *azureBackend.ETag, nil)
-		if err != nil {
+		if azure.IgnoreNotFound(err) != nil {
 			logger.Error(err, "Failed to delete backend")
 			return ctrl.Result{}, err
 		}

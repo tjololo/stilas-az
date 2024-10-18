@@ -57,10 +57,10 @@ func (r *ApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger := log.FromContext(ctx)
 	var apiVersion apimv1alpha1.ApiVersion
 	if err := r.Get(ctx, req.NamespacedName, &apiVersion); err != nil {
-		logger.Error(err, "unable to fetch ApiVersion")
-		// we'll ignore not-found errors, since they can't be fixed by an immediate
-		// requeue (we'll need to wait for a new notification), and we can get them
-		// on deleted requests.
+		if client.IgnoreNotFound(err) != nil {
+			logger.Error(err, "unable to fetch ApiVersion")
+		}
+
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if !controllerutil.ContainsFinalizer(&apiVersion, "apiversion.finalizers.stilas.418.cloud") {
@@ -100,12 +100,13 @@ func (r *ApiVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if apiVersion.Status.LastAppliedSpecSha != latestSha || azure.IsNotFoundError(err) {
 			return r.createUpdateApimApi(ctx, apiVersion)
 		}
+		_, policyErr := r.apimClient.GetApiPolicy(ctx, getApiVersionName(apiVersion), nil)
 		lastPolicySha, shaErr := utils.Sha256FromContent(*apiVersion.Spec.Policy.PolicyContent)
 		if shaErr != nil {
 			logger.Error(err, "Failed to get policy sha")
 			return ctrl.Result{}, err
 		}
-		if apiVersion.Spec.Policy != nil && apiVersion.Status.LastAppliedPolicySha != lastPolicySha {
+		if apiVersion.Spec.Policy != nil && apiVersion.Status.LastAppliedPolicySha != lastPolicySha || azure.IsNotFoundError(policyErr) {
 			if err := r.createUpdatePolicy(ctx, apiVersion); err != nil {
 				logger.Error(err, "Failed to create/update policy")
 				return ctrl.Result{}, err
@@ -143,6 +144,10 @@ func (r *ApiVersionReconciler) createUpdateApimApi(ctx context.Context, apiVesri
 	}
 	logger.Info("Watching LR operation")
 	status, _, token, err := azure.StartResumeOperation(ctx, poller)
+	if err != nil {
+		logger.Error(err, "Failed to watch LR operation")
+		return ctrl.Result{}, err
+	}
 
 	switch status {
 	case azure.OperationStatusFailed:
@@ -239,12 +244,12 @@ func (r *ApiVersionReconciler) deleteApiVersion(ctx context.Context, apiVersion 
 	logger := log.FromContext(ctx)
 	logger.Info("Deleting APIVersion")
 	_, err := r.apimClient.DeleteApi(ctx, getApiVersionName(apiVersion), "*", nil)
-	if err != nil {
+	if azure.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to delete APIVersion")
 		return ctrl.Result{}, err
 	}
 	_, err = r.apimClient.DeleteApiPolicy(ctx, getApiVersionName(apiVersion), "*", nil)
-	if err != nil {
+	if azure.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to delete policy")
 		return ctrl.Result{}, err
 	}

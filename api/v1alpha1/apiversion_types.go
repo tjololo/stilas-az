@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -126,4 +127,34 @@ type ApiVersionList struct {
 
 func init() {
 	SchemeBuilder.Register(&ApiVersion{}, &ApiVersionList{})
+}
+
+func (a *ApiVersion) RequireUpdate(new ApiVersion) bool {
+	return a.Spec.Path != new.Spec.Path ||
+		a.Spec.ApiVersionScheme != new.Spec.ApiVersionScheme ||
+		!pointerValueEqual(a.Spec.APIType, new.Spec.APIType) ||
+		!pointerValueEqual(a.Spec.Contact, new.Spec.Contact) ||
+		!pointerValueEqual(a.Spec.ApiVersionSubSpec.Name, new.Spec.ApiVersionSubSpec.Name) ||
+		a.Spec.ApiVersionSubSpec.DisplayName != new.Spec.ApiVersionSubSpec.DisplayName ||
+		a.Spec.ApiVersionSubSpec.Description != new.Spec.ApiVersionSubSpec.Description ||
+		!pointerValueEqual(a.Spec.ApiVersionSubSpec.ServiceUrl, new.Spec.ApiVersionSubSpec.ServiceUrl) ||
+		!reflect.DeepEqual(a.Spec.ApiVersionSubSpec.Products, new.Spec.ApiVersionSubSpec.Products) ||
+		!pointerValueEqual(a.Spec.ApiVersionSubSpec.ContentFormat, new.Spec.ApiVersionSubSpec.ContentFormat) ||
+		!pointerValueEqual(a.Spec.ApiVersionSubSpec.Content, new.Spec.ApiVersionSubSpec.Content) ||
+		!pointerValueEqual(a.Spec.ApiVersionSubSpec.SubscriptionRequired, new.Spec.ApiVersionSubSpec.SubscriptionRequired) ||
+		!reflect.DeepEqual(a.Spec.ApiVersionSubSpec.Protocols, new.Spec.ApiVersionSubSpec.Protocols) ||
+		!pointerValueEqual(a.Spec.ApiVersionSubSpec.IsCurrent, new.Spec.ApiVersionSubSpec.IsCurrent) ||
+		(a.Spec.ApiVersionSubSpec.Policy == nil && new.Spec.ApiVersionSubSpec.Policy != nil) || (a.Spec.ApiVersionSubSpec.Policy != nil && new.Spec.ApiVersionSubSpec.Policy == nil) ||
+		!pointerValueEqual(a.Spec.ApiVersionSubSpec.Policy.PolicyContent, new.Spec.ApiVersionSubSpec.Policy.PolicyContent) ||
+		!pointerValueEqual(a.Spec.ApiVersionSubSpec.Policy.PolicyFormat, new.Spec.ApiVersionSubSpec.Policy.PolicyFormat)
+}
+
+func pointerValueEqual[T comparable](a *T, b *T) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
