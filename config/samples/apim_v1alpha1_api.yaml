@@ -1,0 +1,25 @@
+apiVersion: apim.azure.stilas.418.cloud/v1alpha1
+kind: Api
+metadata:
+  labels:
+    app.kubernetes.io/name: stilas-az
+    app.kubernetes.io/managed-by: kustomize
+  name: api-sample
+spec:
+  description: "This is a sample API"
+  displayName: "Sample API"
+  versioningScheme: "Segment"
+  path: "sample"
+  apiType: "http"
+  contact:
+    email: "test@example.com"
+    name: "test"
+  versions:
+    - name: "v1"
+      displayName: "Version 1"
+      description: "This is version 1"
+      serviceUrl: "https://api.test.example.com"
+      contentFormat: "openapi+json-link"
+      content: "https://api.test.example.com/swagger/doc.json"
+      subscriptionRequired: false
+
