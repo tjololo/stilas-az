@@ -1,0 +1,23 @@
+# permissions for end users to view apis.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: stilas-az
+    app.kubernetes.io/managed-by: kustomize
+  name: api-viewer-role
+rules:
+- apiGroups:
+  - apim.azure.stilas.418.cloud
+  resources:
+  - apis
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apim.azure.stilas.418.cloud
+  resources:
+  - apis/status
+  verbs:
+  - get

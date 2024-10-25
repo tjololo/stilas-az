@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "azure",
+    srcs = [
+        "apim_client.go",
+        "azure-lro.go",
+    ],
+    importpath = "github.com/tjololo/stilas-az/internal/azure",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@com_github_azure_azure_sdk_for_go_sdk_azcore//:azcore",
+        "@com_github_azure_azure_sdk_for_go_sdk_azcore//arm",
+        "@com_github_azure_azure_sdk_for_go_sdk_azcore//runtime",
+        "@com_github_azure_azure_sdk_for_go_sdk_azidentity//:azidentity",
+        "@com_github_azure_azure_sdk_for_go_sdk_resourcemanager_apimanagement_armapimanagement_v2//:armapimanagement",
+        "@io_k8s_sigs_controller_runtime//pkg/log",
+    ],
+)

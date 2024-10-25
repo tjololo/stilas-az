@@ -46,3 +46,6 @@ go.work
 # Ignore jekyll build output.
 /production
 /.sass-cache
+
+.env
+*.ignore.*

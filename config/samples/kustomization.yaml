@@ -1,0 +1,6 @@
+## Append samples of your project ##
+resources:
+- apim_v1alpha1_api.yaml
+- apim_v1alpha1_apiversion.yaml
+- apim_v1alpha1_backend.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

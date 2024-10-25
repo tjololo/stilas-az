@@ -1,0 +1,23 @@
+# permissions for end users to view apiversions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: stilas-az
+    app.kubernetes.io/managed-by: kustomize
+  name: apiversion-viewer-role
+rules:
+- apiGroups:
+  - apim.azure.stilas.418.cloud
+  resources:
+  - apiversions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apim.azure.stilas.418.cloud
+  resources:
+  - apiversions/status
+  verbs:
+  - get
