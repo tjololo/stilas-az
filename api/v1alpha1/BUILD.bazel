@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "v1alpha1",
     srcs = [
+        "api_converters.go",
         "api_enums.go",
         "api_types.go",
         "apiversion_types.go",
