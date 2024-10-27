@@ -36,6 +36,7 @@ import (
 type BackendReconciler struct {
 	client.Client
 	Scheme     *runtime.Scheme
+	NewClient  newApimCLient
 	apimClient *azure.APIMClient
 }
 
@@ -72,7 +73,7 @@ func (r *BackendReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		logger.Error(err, "Failed to get configuration. No reason to requeue")
 		return ctrl.Result{}, nil
 	}
-	r.apimClient, err = azure.NewAPIMClient(azure.ApimClientConfig{
+	r.apimClient, err = r.NewClient(azure.ApimClientConfig{
 		SubscriptionId:  subscriptionID,
 		ResourceGroup:   resourcesGroup,
 		ApimServiceName: apimName,

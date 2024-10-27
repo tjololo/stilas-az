@@ -34,10 +34,14 @@ import (
 	apimv1alpha1 "github.com/tjololo/stilas-az/api/v1alpha1"
 )
 
+type newApimCLient func(config azure.ApimClientConfig) (*azure.APIMClient, error)
+
 // ApiReconciler reconciles a Api object
 type ApiReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	NewClient  newApimCLient
+	Scheme     *runtime.Scheme
+	apimClient *azure.APIMClient
 }
 
 // +kubebuilder:rbac:groups=apim.azure.stilas.418.cloud,resources=apis,verbs=get;list;watch;create;update;patch;delete
@@ -76,7 +80,7 @@ func (r *ApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		logger.Error(err, "Failed to get configuration. No reason to requeue")
 		return ctrl.Result{}, nil
 	}
-	apimClient, err := azure.NewAPIMClient(azure.ApimClientConfig{
+	r.apimClient, err = r.NewClient(azure.ApimClientConfig{
 		SubscriptionId:  subscriptionID,
 		ResourceGroup:   resourcesGroup,
 		ApimServiceName: apimName,
@@ -89,34 +93,19 @@ func (r *ApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if api.DeletionTimestamp != nil {
 		logger.Info("Deleting API")
 		//Get all owned resources and delete them first
-		var versions apimv1alpha1.ApiVersionList
-		apiVersionErr := r.List(ctx, &versions, client.InNamespace(api.Namespace), client.MatchingFields{"metadata.ownerReferences.uid": string(api.GetUID())})
-		if client.IgnoreNotFound(apiVersionErr) != nil {
-			logger.Error(err, "Failed to list owned resources")
-			return ctrl.Result{}, apiVersionErr
-		}
-		for _, version := range versions.Items {
-			deleteErr := r.Delete(ctx, &version)
-			if deleteErr != nil {
-				logger.Error(err, "Failed to delete owned resource")
-				return ctrl.Result{}, deleteErr
-			}
-		}
-		if versions.Items != nil && len(versions.Items) > 0 {
-			logger.Info("Waiting for owned resources to be deleted")
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		}
-		_, err = apimClient.GetApiVersionSet(ctx, apiName, nil)
-		if azure.IgnoreNotFound(err) != nil {
-			logger.Error(err, "Failed to get API")
+		done, err := r.deleteOwnedResources(ctx, &api)
+		if err != nil {
+			logger.Error(err, "Failed to delete owned resources")
 			return ctrl.Result{}, err
 		}
-		if err == nil {
-			_, err = apimClient.DeleteApiVersionSet(ctx, apiName, "*", nil)
-			if err != nil {
-				logger.Error(err, "Failed to delete API")
-				return ctrl.Result{}, err
-			}
+		if !done {
+			logger.Info("Owned resources not yet deleted")
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+		err = r.deleteAzureResources(ctx, apiName)
+		if err != nil {
+			logger.Error(err, "Failed to delete Azure resources")
+			return ctrl.Result{}, err
 		}
 		controllerutil.RemoveFinalizer(&api, "api.finalizers.stilas.418.cloud")
 		err = r.Update(ctx, &api)
@@ -124,14 +113,13 @@ func (r *ApiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			logger.Error(err, "Failed to remove finalizer")
 			return ctrl.Result{}, err
 		}
-		logger.Info("API deleted")
 		return ctrl.Result{}, nil
 	}
 	var resId *string
 
-	getRes, err := apimClient.GetApiVersionSet(ctx, apiName, nil)
+	getRes, err := r.apimClient.GetApiVersionSet(ctx, apiName, nil)
 	if azure.IsNotFoundError(err) {
-		result, err := apimClient.CreateUpdateApiVersionSet(
+		result, err := r.apimClient.CreateUpdateApiVersionSet(
 			ctx,
 			apiName,
 			apim.APIVersionSetContract{
@@ -235,6 +223,37 @@ func (r *ApiReconciler) reconcileVersions(ctx context.Context, api *apimv1alpha1
 		}
 	}
 
+	return nil
+}
+
+func (r *ApiReconciler) deleteOwnedResources(ctx context.Context, api *apimv1alpha1.Api) (done bool, err error) {
+	var versions apimv1alpha1.ApiVersionList
+	apiVersionErr := r.List(ctx, &versions, client.InNamespace(api.Namespace), client.MatchingFields{"metadata.ownerReferences.uid": string(api.GetUID())})
+	if client.IgnoreNotFound(apiVersionErr) != nil {
+		return false, apiVersionErr
+	}
+	for _, version := range versions.Items {
+		if version.DeletionTimestamp != nil {
+			deleteErr := r.Delete(ctx, &version)
+			if deleteErr != nil {
+				return false, deleteErr
+			}
+		}
+	}
+	return len(versions.Items) == 0, nil
+}
+
+func (r *ApiReconciler) deleteAzureResources(ctx context.Context, apiName string) error {
+	_, err := r.apimClient.GetApiVersionSet(ctx, apiName, nil)
+	if azure.IgnoreNotFound(err) != nil {
+		return fmt.Errorf("failed to get API version set: %w", err)
+	}
+	if err == nil {
+		_, err = r.apimClient.DeleteApiVersionSet(ctx, apiName, "*", nil)
+		if err != nil {
+			return fmt.Errorf("failed to delete API version set: %w", err)
+		}
+	}
 	return nil
 }
 
